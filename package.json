@@ -1,0 +1,19 @@
+{
+  "name": "living-rpg",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Web-first AI-moderated turn-based RPG monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node --test --import tsx tests/unit/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
