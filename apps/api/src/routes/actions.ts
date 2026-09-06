@@ -3,6 +3,7 @@ import { IntentParser } from "../../../../packages/ai-orchestrator/IntentParser"
 import { EventLog } from "../../../../packages/event-engine/EventLog";
 import { AuthorityEngine } from "../../../../packages/rules-engine/src/AuthorityEngine";
 import { isStructuredCommand, type StructuredCommand } from "../../../../packages/schemas/src/action.schema";
+import { compileDrop, type DragDropPayload } from "../../../web/src/drag-drop/compileDrop";
 
 type ActionSubmission = {
   actorId: string;
@@ -31,4 +32,9 @@ export function submitAction(submission: ActionSubmission) {
     event,
     narration: narrator.narrate(event)
   };
+}
+
+export function submitDropAction(payload: DragDropPayload) {
+  const command = compileDrop(payload);
+  return submitAction({ actorId: payload.card.actorId, command });
 }
