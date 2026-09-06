@@ -1,4 +1,7 @@
 {
+  "id": "demo-world",
+  "name": "Greyhaven",
+  "startingLocationId": "black-hart-inn",
   "locations": [{"id":"black-hart-inn","name":"The Black Hart Inn","description":"A rain-darkened tavern on the King's Road."}],
   "npcs": [
     {"id":"mara","name":"Mara","role":"innkeeper","voice":"low and watchful"},

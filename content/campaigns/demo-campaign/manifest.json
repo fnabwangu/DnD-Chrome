@@ -1,6 +1,7 @@
 {
   "id": "demo-campaign",
   "title": "The Black Hart Inn",
+  "name": "Demo Campaign",
   "version": 1,
   "entryLocation": "black-hart-inn",
   "files": ["world.json"]
