@@ -1,0 +1,11 @@
+{
+  "name": "@living-rpg/api",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": { "dev": "tsx src/server.ts" },
+  "dependencies": {
+    "@living-rpg/schemas": "workspace:*",
+    "@living-rpg/turn-engine": "workspace:*",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "@living-rpg/database",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@living-rpg/schemas": "workspace:*" }
+}

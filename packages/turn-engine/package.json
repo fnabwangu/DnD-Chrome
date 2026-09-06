@@ -1,0 +1,7 @@
+{
+  "name": "@living-rpg/turn-engine",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": { "@living-rpg/schemas": "workspace:*", "@living-rpg/event-engine": "workspace:*", "@living-rpg/rules-engine": "workspace:*" },
+  "exports": { ".": "./src/index.ts" }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "living-rpg",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "dev": "pnpm --parallel --filter @living-rpg/api --filter @living-rpg/web dev",
+    "validate:campaign": "tsx scripts/validate-campaign.ts",
+    "demo:reset": "tsx scripts/demo-reset.ts"
+  },
+  "dependencies": {
+    "@living-rpg/event-engine": "workspace:*",
+    "@living-rpg/ai-orchestrator": "workspace:*",
+    "@living-rpg/media-engine": "workspace:*",
+    "@living-rpg/news-engine": "workspace:*",
+    "@living-rpg/npc-engine": "workspace:*",
+    "@living-rpg/rules-engine": "workspace:*",
+    "@living-rpg/schemas": "workspace:*",
+    "@living-rpg/turn-engine": "workspace:*",
+    "zod": "^3.24.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "vitest": "^3.0.5"
+  }
+}

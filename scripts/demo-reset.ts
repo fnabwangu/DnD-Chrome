@@ -1,0 +1,1 @@
+console.log("Demo sessions are in memory and reset automatically when the API restarts.");

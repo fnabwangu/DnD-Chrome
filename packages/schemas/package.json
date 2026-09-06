@@ -1,0 +1,7 @@
+{
+  "name": "@living-rpg/schemas",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": { "zod": "^3.24.1" },
+  "exports": { ".": "./src/index.ts" }
+}

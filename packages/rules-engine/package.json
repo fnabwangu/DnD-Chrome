@@ -1,0 +1,7 @@
+{
+  "name": "@living-rpg/rules-engine",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": { "@living-rpg/schemas": "workspace:*" },
+  "exports": { ".": "./src/index.ts" }
+}

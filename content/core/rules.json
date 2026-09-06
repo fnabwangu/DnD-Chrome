@@ -1,0 +1,18 @@
+{
+  "system": "Living RPG Core Rules",
+  "version": "0.1.0",
+  "phases": [
+    "EXPLORATION",
+    "ENCOUNTER_START",
+    "PLAYER_PLANNING",
+    "PLAYER_COMMIT",
+    "PLAYER_RESOLUTION",
+    "REACTION_WINDOW",
+    "ENEMY_PLANNING",
+    "ENEMY_RESOLUTION",
+    "ROUND_COMPLETE",
+    "ENCOUNTER_COMPLETE"
+  ],
+  "defaultMovementRange": 4,
+  "defaultAttackDamage": 4
+}
