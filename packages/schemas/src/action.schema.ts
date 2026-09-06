@@ -23,6 +23,7 @@ export function isStructuredCommand(input: unknown): input is StructuredCommand 
   const candidate = input as Partial<StructuredCommand>;
   if (!candidate.type || !candidate.actorId || !candidate.target) return false;
   if (candidate.type !== "CAST_SPELL" && candidate.type !== "ATTACK") return false;
+  if (candidate.type === "CAST_SPELL" && (!candidate.spellId || typeof candidate.spellId !== "string")) return false;
 
   const target = candidate.target as Partial<Target>;
   if (target.type === "POINT") {

@@ -1,5 +1,6 @@
 import { DMNarrator } from "../../../../packages/ai-orchestrator/DMNarrator";
 import { IntentParser } from "../../../../packages/ai-orchestrator/IntentParser";
+import { assertNoCanonicalStateMutationFields } from "../../../../packages/ai-orchestrator/Guardrails";
 import { EventLog } from "../../../../packages/event-engine/EventLog";
 import { AuthorityEngine } from "../../../../packages/rules-engine/src/AuthorityEngine";
 import { isStructuredCommand, type StructuredCommand } from "../../../../packages/schemas/src/action.schema";
@@ -17,6 +18,10 @@ const authority = new AuthorityEngine(events, { npc_goblin_22: 11 });
 const narrator = new DMNarrator();
 
 export function submitAction(submission: ActionSubmission) {
+  if (submission.command) {
+    assertNoCanonicalStateMutationFields(submission.command);
+  }
+
   const structuredCommand = submission.command
     ? submission.command
     : submission.intent

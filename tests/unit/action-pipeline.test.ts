@@ -38,6 +38,37 @@ test("natural language intent is parsed into structured command and resolved", (
   assert.equal(result.narration, "pc_xavi acts.");
 });
 
+test("guardrails reject command payloads containing canonical fields", () => {
+  assert.throws(
+    () =>
+      submitAction({
+        actorId: "pc_xavi",
+        command: {
+          type: "ATTACK",
+          actorId: "pc_xavi",
+          target: { type: "UNIT", targetId: "npc_goblin_22" },
+          sequence: 999
+        } as unknown as Parameters<typeof submitAction>[0]["command"]
+      }),
+    /canonical-state field: sequence/
+  );
+});
+
+test("CAST_SPELL without spellId is rejected", () => {
+  assert.throws(
+    () =>
+      submitAction({
+        actorId: "pc_xavi",
+        command: {
+          type: "CAST_SPELL",
+          actorId: "pc_xavi",
+          target: { type: "POINT", x: 17, y: 8 }
+        } as unknown as Parameters<typeof submitAction>[0]["command"]
+      }),
+    /valid structured command/
+  );
+});
+
 test("invalid input is rejected", () => {
   assert.throws(() => submitAction({ actorId: "pc_xavi" }), /valid structured command/);
 });
