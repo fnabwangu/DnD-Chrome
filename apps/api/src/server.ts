@@ -1,21 +1,9 @@
 import { createServer } from "node:http";
-import { TurnSession } from "@living-rpg/turn-engine";
-import { CommandSchema, type Command, type WorldEvent, type WorldSnapshot } from "@living-rpg/schemas";
-import { generateNews } from "@living-rpg/news-engine";
+import { GameApplication } from "@living-rpg/application";
+import { CommandSchema } from "@living-rpg/schemas";
 import { WebSocketServer, type WebSocket } from "ws";
 
-const initial: WorldSnapshot = {
-  version: 0, phase: "EXPLORATION", worldTime: "Night, 14th of Ember", knownSecrets: {}, npcMemories: {},
-  characters: {
-    xavi: { id: "xavi", name: "Xavi", hp: 12, maxHp: 12, x: 1, y: 1, alive: true },
-    matu: { id: "matu", name: "Matu", hp: 12, maxHp: 12, x: 1, y: 2, alive: true },
-    mara: { id: "mara", name: "Mara", hp: 10, maxHp: 10, x: 2, y: 1, alive: true },
-    "ash-raider": { id: "ash-raider", name: "Ash Raider", hp: 8, maxHp: 8, x: 5, y: 2, alive: true },
-    "coin-raider": { id: "coin-raider", name: "Coin Raider", hp: 8, maxHp: 8, x: 5, y: 4, alive: true }
-  }
-};
-
-const session = new TurnSession(initial);
+const game = new GameApplication();
 const realtime = new WebSocketServer({ noServer: true });
 
 function send(response: import("node:http").ServerResponse, status: number, body: unknown): void {
@@ -30,43 +18,71 @@ function broadcast(message: unknown): void {
   });
 }
 
-function derived(event: WorldEvent): { narration?: string; cue?: Record<string, unknown> } {
-  if (event.type === "DAMAGE_APPLIED") {
-    const target = event.targetId === "ash-raider" ? "the Ash Raider" : "the Coin Raider";
-    return { narration: `Xavi's arrow catches ${target}. The inn falls silent for one sharp breath.`, cue: { type: "SOUND_EFFECT", sound: "arrow-impact", eventId: event.id } };
-  }
-  if (event.type === "SECRET_LEARNED") return { narration: "Mara leans close and shares a secret meant for the party alone.", cue: { type: "NPC_SPEECH", actorId: "mara", text: "Keep your voices low." , eventId: event.id } };
-  return {};
+async function readBody(request: import("node:http").IncomingMessage): Promise<unknown> {
+  let raw = "";
+  for await (const chunk of request) raw += chunk;
+  return JSON.parse(raw);
+}
+
+function siteResponse(summary: string, structuredContent: unknown): { content: Array<{ type: "text"; text: string }>; structuredContent: unknown } {
+  return { content: [{ type: "text", text: summary }], structuredContent };
+}
+
+function visibleEvents() {
+  return game.events
+    .filter((event) => event.visibility === "public" || event.visibility === "party")
+    .map(({ id, type, sequence, actorId, targetId }) => ({ id, type, sequence, actorId, targetId }));
+}
+
+function clientResult(result: ReturnType<GameApplication["execute"]> | ReturnType<GameApplication["advanceMorning"]>) {
+  return { events: result.events.map(({ id, type, sequence, actorId, targetId }) => ({ id, type, sequence, actorId, targetId })), view: result.view };
 }
 
 const server = createServer(async (request, response) => {
   if (request.method === "OPTIONS") { response.writeHead(204, { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type" }); response.end(); return; }
-  if (request.url === "/api/state" && request.method === "GET") { send(response, 200, { snapshot: session.snapshot, events: session.eventLog.all(), pendingCommands: session.pendingCommands }); return; }
-  if (request.url === "/api/news" && request.method === "GET") {
-    send(response, 200, generateNews(session.eventLog.all())); return;
+  const url = new URL(request.url ?? "/", "http://localhost");
+  const viewerId = url.searchParams.get("viewerId") ?? "player";
+  if ((url.pathname === "/api/state" || url.pathname === "/api/site/view") && request.method === "GET") {
+    const view = game.getView(viewerId);
+    const body = url.pathname === "/api/site/view" ? siteResponse(`Black Hart Inn: ${view.phase}, ${view.worldTime}.`, view) : { events: visibleEvents(), view };
+    send(response, 200, body); return;
   }
-  if (request.url === "/api/morning" && request.method === "POST") {
-    const event: WorldEvent = { id: `evt_${session.snapshot.version + 1}`, sessionId: "demo", campaignId: "demo-campaign", sequence: session.snapshot.version + 1, worldTime: "Morning, 15th of Ember", realTimestamp: new Date().toISOString(), type: "WORLD_TIME_ADVANCED", payload: { worldTime: "Morning, 15th of Ember" }, visibility: "public" };
-    session.append(event);
-    broadcast({ type: "EVENTS", events: [event], snapshot: session.snapshot });
-    send(response, 200, { event, snapshot: session.snapshot, news: generateNews(session.eventLog.all()) }); return;
+  if (url.pathname === "/api/news" && request.method === "GET") {
+    send(response, 200, game.getView(viewerId).news); return;
   }
-  if (request.url === "/api/commands" && request.method === "POST") {
+  if ((url.pathname === "/api/morning" || url.pathname === "/api/site/morning") && request.method === "POST") {
     try {
-      const body = await new Promise<string>((resolve, reject) => { let raw = ""; request.on("data", (chunk) => raw += chunk); request.on("end", () => resolve(raw)); request.on("error", reject); });
-      const parsed = CommandSchema.safeParse(JSON.parse(body));
-      if (!parsed.success) { send(response, 400, { error: "Invalid command shape", details: parsed.error.flatten() }); return; }
-      const command = parsed.data as Command;
-      const events = command.type === "RESPOND_REACTION" ? session.resolveReaction(command) : session.submit(command);
-      const extras: WorldEvent[] = [];
-      if (events.some((event) => event.type === "DAMAGE_APPLIED")) {
-        const memory: WorldEvent = { id: `evt_${session.snapshot.version + 1}`, sessionId: command.sessionId, campaignId: "demo-campaign", sequence: session.snapshot.version + 1, worldTime: session.snapshot.worldTime, realTimestamp: new Date().toISOString(), type: "NPC_MEMORY_CREATED", actorId: "mara", payload: { memory: "Mara witnessed the party strike the raiders." }, visibility: "party", causedByCommandId: command.id };
-        session.append(memory); extras.push(memory);
-      }
-      broadcast({ type: "EVENTS", events: [...events, ...extras], snapshot: session.snapshot });
-      send(response, 200, { events: [...events, ...extras], pendingCommands: session.pendingCommands, snapshot: session.snapshot, presentation: [...events, ...extras].map(derived) });
+      const result = game.advanceMorning();
+      const client = clientResult(result);
+      broadcast({ type: "EVENTS", ...client });
+      send(response, 200, url.pathname === "/api/site/morning" ? siteResponse("Morning arrives at the Black Hart Inn.", client) : client);
     } catch (error) { send(response, 409, { error: error instanceof Error ? error.message : "Command rejected" }); }
     return;
+  }
+  if (url.pathname === "/api/site/intent" && request.method === "POST") {
+    try {
+      const body = await readBody(request) as { actorId?: unknown; text?: unknown; sessionId?: unknown };
+      if (typeof body.actorId !== "string" || typeof body.text !== "string") throw new Error("actorId and text are required");
+      const proposal = game.submitIntent(body.actorId, body.text, typeof body.sessionId === "string" ? body.sessionId : "demo");
+      send(response, 200, siteResponse(`Proposed ${proposal.actions.length || "no"} action${proposal.actions.length === 1 ? "" : "s"}; confirmation is required.`, proposal));
+    } catch (error) { send(response, 400, { error: error instanceof Error ? error.message : "Invalid intent" }); }
+    return;
+  }
+  if ((url.pathname === "/api/commands" || url.pathname === "/api/site/actions") && request.method === "POST") {
+    try {
+      const parsed = CommandSchema.safeParse(await readBody(request));
+      if (!parsed.success) { send(response, 400, { error: "Invalid command shape", details: parsed.error.flatten() }); return; }
+      const result = game.execute(parsed.data);
+      const client = clientResult(result);
+      broadcast({ type: "EVENTS", ...client });
+      send(response, 200, url.pathname === "/api/site/actions" ? siteResponse(`Committed ${result.events.length} event${result.events.length === 1 ? "" : "s"}; world version ${result.view.worldVersion}.`, client) : client);
+    } catch (error) { send(response, 409, { error: error instanceof Error ? error.message : "Command rejected" }); }
+    return;
+  }
+  if (url.pathname === "/api/site/events" && request.method === "GET") {
+    const afterSequence = Number(url.searchParams.get("afterSequence") ?? 0);
+    const events = game.events.filter((event) => event.sequence > afterSequence);
+    send(response, 200, siteResponse(`${events.length} event${events.length === 1 ? "" : "s"} after sequence ${afterSequence}.`, { events, worldVersion: game.snapshot.version })); return;
   }
   send(response, 404, { error: "Not found" });
 });
@@ -77,7 +93,7 @@ server.on("upgrade", (request, socket, head) => {
 });
 
 realtime.on("connection", (client) => {
-  client.send(JSON.stringify({ type: "SNAPSHOT", snapshot: session.snapshot, events: session.eventLog.all() }));
+  client.send(JSON.stringify({ type: "SNAPSHOT", events: visibleEvents(), view: game.getView() }));
 });
 
 server.listen(3001, () => console.log("Living RPG API listening on http://localhost:3001"));

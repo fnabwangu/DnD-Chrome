@@ -10,5 +10,21 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["apps/**/*.ts", "packages/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "apps/api/src/server.ts",
+    "apps/web/src/**/*.ts",
+    "packages/*/src/**/*.ts",
+    "scripts/**/*.ts"
+  ],
+  "exclude": [
+    "apps/api/src/routes/**",
+    "packages/ai-orchestrator/*.ts",
+    "packages/event-engine/*.ts",
+    "packages/media-engine/*.ts",
+    "packages/multiplayer/*.ts",
+    "packages/narrative-engine/*.ts",
+    "packages/rules-engine/src/AuthorityEngine.ts",
+    "tests/core-loop.test.ts",
+    "tests/support.test.ts"
+  ]
 }

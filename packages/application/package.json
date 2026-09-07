@@ -7,6 +7,7 @@
   "dependencies": {
     "@living-rpg/news-engine": "workspace:*",
     "@living-rpg/schemas": "workspace:*",
-    "@living-rpg/turn-engine": "workspace:*"
+    "@living-rpg/turn-engine": "workspace:*",
+    "zod": "^3.24.1"
   }
 }

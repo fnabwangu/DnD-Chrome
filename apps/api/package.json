@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": { "dev": "tsx src/server.ts" },
   "dependencies": {
+    "@living-rpg/application": "workspace:*",
     "@living-rpg/schemas": "workspace:*",
-    "@living-rpg/turn-engine": "workspace:*",
     "ws": "^8.18.0"
   }
 }

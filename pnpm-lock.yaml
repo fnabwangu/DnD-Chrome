@@ -11,6 +11,9 @@ importers:
       '@types/node':
         specifier: ^24.3.0
         version: 24.13.3
+      '@types/ws':
+        specifier: ^8.5.13
+        version: 8.18.1
       tsx:
         specifier: ^4.20.5
         version: 4.23.13
@@ -20,12 +23,12 @@ importers:
 
   apps/api:
     dependencies:
+      '@living-rpg/application':
+        specifier: workspace:*
+        version: link:../../packages/application
       '@living-rpg/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
-      '@living-rpg/turn-engine':
-        specifier: workspace:*
-        version: link:../../packages/turn-engine
       ws:
         specifier: ^8.18.0
         version: 8.21.3
@@ -57,6 +60,9 @@ importers:
       '@living-rpg/turn-engine':
         specifier: workspace:*
         version: link:../turn-engine
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
 
   packages/database:
     dependencies:
@@ -607,6 +613,9 @@ packages:
   '@types/node@24.13.3':
     resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
 
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+
   esbuild@0.25.12:
     resolution: {integrity: sha512-bbPBYYrtZbkt6Os6FiTLCTFxvq4tt3JKall1vRwshA3fdVztsLAatFaZobhkBC8/BrPetoa0oksYoKXoG4ryJg==}
     engines: {node: '>=18'}
@@ -969,6 +978,10 @@ snapshots:
   '@types/node@24.13.3':
     dependencies:
       undici-types: 7.18.2
+
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 24.13.3
 
   esbuild@0.25.12:
     optionalDependencies:
