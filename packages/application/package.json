@@ -1,0 +1,12 @@
+{
+  "name": "@living-rpg/application",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@living-rpg/news-engine": "workspace:*",
+    "@living-rpg/schemas": "workspace:*",
+    "@living-rpg/turn-engine": "workspace:*"
+  }
+}
