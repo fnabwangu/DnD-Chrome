@@ -1,0 +1,31 @@
+{
+  "id": "black-hart-render-v1",
+  "seed": "black-hart-render-v1",
+  "stage": { "width": 1440, "height": 810, "columns": 16, "rows": 9, "cellSize": 90, "origin": "top-left" },
+  "map": {
+    "id": "black-hart-common-room-v1",
+    "blockedCells": [
+      {"col":0,"row":0},{"col":1,"row":0},{"col":2,"row":0},{"col":3,"row":0},{"col":4,"row":0},{"col":5,"row":0},{"col":6,"row":0},{"col":7,"row":0},{"col":8,"row":0},{"col":9,"row":0},{"col":10,"row":0},{"col":11,"row":0},{"col":12,"row":0},{"col":13,"row":0},{"col":14,"row":0},{"col":15,"row":0},
+      {"col":0,"row":1},{"col":15,"row":1},{"col":0,"row":2},{"col":15,"row":2},{"col":0,"row":3},{"col":15,"row":3},{"col":0,"row":4},{"col":15,"row":4},{"col":0,"row":5},{"col":15,"row":5},{"col":0,"row":6},{"col":15,"row":6},{"col":0,"row":7},{"col":15,"row":7},{"col":0,"row":8},{"col":1,"row":8},{"col":2,"row":8},{"col":3,"row":8},{"col":4,"row":8},{"col":5,"row":8},{"col":6,"row":8},{"col":7,"row":8},{"col":8,"row":8},{"col":9,"row":8},{"col":10,"row":8},{"col":11,"row":8},{"col":12,"row":8},{"col":13,"row":8},{"col":14,"row":8},{"col":15,"row":8},
+      {"col":5,"row":3},{"col":6,"row":3},{"col":7,"row":3},{"col":8,"row":3},{"col":9,"row":3},{"col":10,"row":3},{"col":5,"row":4},{"col":6,"row":4},{"col":7,"row":4},{"col":8,"row":4},{"col":9,"row":4},{"col":10,"row":4},
+      {"col":1,"row":2},{"col":2,"row":2},{"col":1,"row":3},{"col":2,"row":3},{"col":13,"row":1},{"col":14,"row":1},{"col":13,"row":2},{"col":14,"row":2},{"col":3,"row":6},{"col":3,"row":7}
+    ],
+    "entrances": [{"col":15,"row":5}],
+    "interactiveAreas": [
+      {"id":"kings-road-door","label":"King's Road door","kind":"EXIT","cells":[{"col":15,"row":5}]},
+      {"id":"hearth","label":"The hearth","kind":"INSPECT","cells":[{"col":2,"row":5},{"col":2,"row":6}]},
+      {"id":"mara-bar","label":"Mara's bar","kind":"DIALOGUE","cells":[{"col":12,"row":6},{"col":13,"row":6}]},
+      {"id":"varro-table","label":"Captain Varro's table","kind":"DIALOGUE","cells":[{"col":9,"row":2},{"col":10,"row":2}]}
+    ]
+  },
+  "actors": [
+    {"id":"xavi","name":"Xavi","control":"player","team":"party","position":{"col":5,"row":6},"hp":12,"maxHp":12},
+    {"id":"matu","name":"Matu","control":"player","team":"party","position":{"col":5,"row":7},"hp":12,"maxHp":12},
+    {"id":"mara","name":"Mara","control":"npc","team":"ally","position":{"col":12,"row":6},"hp":10,"maxHp":10},
+    {"id":"varro","name":"Captain Varro","control":"npc","team":"neutral","position":{"col":9,"row":2},"hp":14,"maxHp":14},
+    {"id":"stranger","name":"Hooded Stranger","control":"npc","team":"unknown","position":{"col":4,"row":2},"hp":8,"maxHp":8},
+    {"id":"ash-raider","name":"Ash Raider","control":"npc","team":"hostile","position":{"col":12,"row":3},"hp":8,"maxHp":8},
+    {"id":"coin-raider","name":"Coin Raider","control":"npc","team":"hostile","position":{"col":13,"row":4},"hp":8,"maxHp":8}
+  ],
+  "assets": {"version":1,"background":"background.black-hart","fallback":"#382d25"}
+}

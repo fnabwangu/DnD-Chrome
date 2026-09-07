@@ -5,6 +5,7 @@
   "scripts": { "dev": "tsx src/server.ts" },
   "dependencies": {
     "@living-rpg/application": "workspace:*",
+    "@living-rpg/database": "workspace:*",
     "@living-rpg/schemas": "workspace:*",
     "ws": "^8.18.0"
   }

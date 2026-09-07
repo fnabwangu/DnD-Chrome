@@ -3,5 +3,5 @@
   "version": "0.1.0",
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@living-rpg/schemas": "workspace:*" }
+  "dependencies": { "@living-rpg/application": "workspace:*", "@living-rpg/schemas": "workspace:*" }
 }

@@ -2,6 +2,31 @@ import type { Command, WorldEvent, WorldSnapshot } from "@living-rpg/schemas";
 
 export class RuleViolation extends Error {}
 
+const blockedCells = new Set([
+  ...Array.from({ length: 16 }, (_, col) => `${col},0`),
+  ...Array.from({ length: 16 }, (_, col) => `${col},8`),
+  ...Array.from({ length: 7 }, (_, row) => `0,${row + 1}`),
+  ...Array.from({ length: 7 }, (_, row) => `15,${row + 1}`),
+  ...[3, 4].flatMap((row) => [5, 6, 7, 8, 9, 10].map((col) => `${col},${row}`)),
+  ...[2, 3].flatMap((row) => [1, 2, 13, 14].map((col) => `${col},${row}`)), "3,6", "3,7"
+]);
+
+function isCellOpen(x: number, y: number, snapshot: WorldSnapshot, actorId: string): boolean {
+  return x >= 0 && x < 16 && y >= 0 && y < 9 && !blockedCells.has(`${x},${y}`) && !Object.values(snapshot.characters).some((character) => character.id !== actorId && character.alive && character.x === x && character.y === y);
+}
+
+function hasLineOfSight(sourceX: number, sourceY: number, targetX: number, targetY: number): boolean {
+  const dx = targetX - sourceX;
+  const dy = targetY - sourceY;
+  const steps = Math.max(Math.abs(dx), Math.abs(dy));
+  for (let step = 1; step < steps; step += 1) {
+    const x = Math.round(sourceX + (dx * step) / steps);
+    const y = Math.round(sourceY + (dy * step) / steps);
+    if (blockedCells.has(`${x},${y}`)) return false;
+  }
+  return true;
+}
+
 export function resolveCommand(command: Command, snapshot: WorldSnapshot, sequence: number, now = new Date()): WorldEvent[] {
   if (command.expectedWorldVersion !== snapshot.version) {
     throw new RuleViolation(`Stale world version: expected ${snapshot.version}, received ${command.expectedWorldVersion}`);
@@ -17,14 +42,22 @@ export function resolveCommand(command: Command, snapshot: WorldSnapshot, sequen
     case "MOVE_CHARACTER": {
       const x = command.payload.x;
       const y = command.payload.y;
-      if (typeof x !== "number" || typeof y !== "number" || Math.abs(x - actor.x) + Math.abs(y - actor.y) > 4) throw new RuleViolation("Movement exceeds this turn's range");
-      return [{ ...base, type: "CHARACTER_MOVED", payload: { x, y } }];
+      const source = command.payload.source;
+      if (typeof x !== "number" || typeof y !== "number" || !Number.isInteger(x) || !Number.isInteger(y)) throw new RuleViolation("Movement requires an integer grid cell");
+      if (source && (typeof source !== "object" || (source as { col?: unknown }).col !== actor.x || (source as { row?: unknown }).row !== actor.y)) throw new RuleViolation("Movement source is stale");
+      if (Math.abs(x - actor.x) + Math.abs(y - actor.y) !== 1) throw new RuleViolation("Movement must be one cardinal step");
+      if (!isCellOpen(x, y, snapshot, actor.id)) throw new RuleViolation("Destination is blocked or occupied");
+      return [{ ...base, type: "CHARACTER_MOVED", payload: { x, y, path: [{ col: actor.x, row: actor.y }, { col: x, row: y }] } }];
     }
     case "ATTACK_TARGET": {
       if (snapshot.phase !== "PLAYER_PLANNING") throw new RuleViolation("Combat actions require player planning");
       const targetId = command.payload.targetId;
       if (typeof targetId !== "string" || !snapshot.characters[targetId]?.alive) throw new RuleViolation("Target is not available");
       const target = snapshot.characters[targetId];
+      const distance = Math.abs(actor.x - target.x) + Math.abs(actor.y - target.y);
+      const ranged = command.payload.rangeMode === "ranged";
+      if (ranged ? distance > 6 : distance !== 1) throw new RuleViolation(ranged ? "Target is outside ranged distance" : "Target is outside melee range");
+      if (!hasLineOfSight(actor.x, actor.y, target.x, target.y)) throw new RuleViolation("Target line of sight is blocked");
       const damage = 4;
       return [{ ...base, type: "REACTION_WINDOW_OPENED", targetId, payload: { reactionId: `reaction_${sequence}`, actorId: command.actorId, options: ["ACCEPT_HIT", "USE_REACTION", "ASK_GM"], damage, resultingHp: Math.max(0, target.hp - damage) } }];
     }
@@ -45,6 +78,11 @@ export function resolveCommand(command: Command, snapshot: WorldSnapshot, sequen
     }
     case "INTERACT_WITH_NPC":
       return [{ ...base, type: "SECRET_LEARNED", targetId: String(command.payload.npcId), payload: { secret: "The watch captain is hunting a smuggler inside the inn." }, visibility: "party" }];
+    case "INSPECT_AREA": {
+      const areaId = command.payload.areaId;
+      if (areaId !== "hearth" && areaId !== "kings-road-door" && areaId !== "varro-table") throw new RuleViolation("Area is not inspectable");
+      return [{ ...base, type: "AREA_INSPECTED", locationId: String(areaId), payload: { areaId }, visibility: "public" }];
+    }
     case "END_PHASE":
       if (snapshot.phase !== "PLAYER_PLANNING") throw new RuleViolation("There is no player phase to commit");
       return [{ ...base, type: "PHASE_CHANGED", payload: { phase: "PLAYER_RESOLUTION" } }];

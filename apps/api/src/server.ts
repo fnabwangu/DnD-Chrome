@@ -1,9 +1,11 @@
 import { createServer } from "node:http";
+import { FileGameRepository, PersistentGameService } from "@living-rpg/database";
 import { GameApplication } from "@living-rpg/application";
 import { CommandSchema } from "@living-rpg/schemas";
 import { WebSocketServer, type WebSocket } from "ws";
 
-const game = new GameApplication();
+const repository = new FileGameRepository(process.env.LIVING_RPG_DATA_FILE ?? ".data/black-hart.json");
+const game = new PersistentGameService(repository);
 const realtime = new WebSocketServer({ noServer: true });
 
 function send(response: import("node:http").ServerResponse, status: number, body: unknown): void {
@@ -28,13 +30,13 @@ function siteResponse(summary: string, structuredContent: unknown): { content: A
   return { content: [{ type: "text", text: summary }], structuredContent };
 }
 
-function visibleEvents() {
-  return game.events
+async function visibleEvents(sessionId = "demo") {
+  return (await game.getEvents(sessionId, 0))
     .filter((event) => event.visibility === "public" || event.visibility === "party")
     .map(({ id, type, sequence, actorId, targetId }) => ({ id, type, sequence, actorId, targetId }));
 }
 
-function clientResult(result: ReturnType<GameApplication["execute"]> | ReturnType<GameApplication["advanceMorning"]>) {
+function clientResult(result: Awaited<ReturnType<PersistentGameService["execute"]>> | Awaited<ReturnType<PersistentGameService["advanceMorning"]>>) {
   return { events: result.events.map(({ id, type, sequence, actorId, targetId }) => ({ id, type, sequence, actorId, targetId })), view: result.view };
 }
 
@@ -43,16 +45,17 @@ const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", "http://localhost");
   const viewerId = url.searchParams.get("viewerId") ?? "player";
   if ((url.pathname === "/api/state" || url.pathname === "/api/site/view") && request.method === "GET") {
-    const view = game.getView(viewerId);
-    const body = url.pathname === "/api/site/view" ? siteResponse(`Black Hart Inn: ${view.phase}, ${view.worldTime}.`, view) : { events: visibleEvents(), view };
+    const sessionId = url.searchParams.get("sessionId") ?? "demo";
+    const view = await game.getView(sessionId, viewerId);
+    const body = url.pathname === "/api/site/view" ? siteResponse(`Black Hart Inn: ${view.phase}, ${view.worldTime}.`, view) : { events: await visibleEvents(sessionId), view };
     send(response, 200, body); return;
   }
   if (url.pathname === "/api/news" && request.method === "GET") {
-    send(response, 200, game.getView(viewerId).news); return;
+    send(response, 200, (await game.getView(url.searchParams.get("sessionId") ?? "demo", viewerId)).news); return;
   }
   if ((url.pathname === "/api/morning" || url.pathname === "/api/site/morning") && request.method === "POST") {
     try {
-      const result = game.advanceMorning();
+      const result = await game.advanceMorning(url.searchParams.get("sessionId") ?? "demo");
       const client = clientResult(result);
       broadcast({ type: "EVENTS", ...client });
       send(response, 200, url.pathname === "/api/site/morning" ? siteResponse("Morning arrives at the Black Hart Inn.", client) : client);
@@ -63,7 +66,8 @@ const server = createServer(async (request, response) => {
     try {
       const body = await readBody(request) as { actorId?: unknown; text?: unknown; sessionId?: unknown };
       if (typeof body.actorId !== "string" || typeof body.text !== "string") throw new Error("actorId and text are required");
-      const proposal = game.submitIntent(body.actorId, body.text, typeof body.sessionId === "string" ? body.sessionId : "demo");
+      const view = await game.getView(typeof body.sessionId === "string" ? body.sessionId : "demo", body.actorId);
+      const proposal = new GameApplication().submitIntent(body.actorId, body.text, view.sessionId);
       send(response, 200, siteResponse(`Proposed ${proposal.actions.length || "no"} action${proposal.actions.length === 1 ? "" : "s"}; confirmation is required.`, proposal));
     } catch (error) { send(response, 400, { error: error instanceof Error ? error.message : "Invalid intent" }); }
     return;
@@ -72,7 +76,7 @@ const server = createServer(async (request, response) => {
     try {
       const parsed = CommandSchema.safeParse(await readBody(request));
       if (!parsed.success) { send(response, 400, { error: "Invalid command shape", details: parsed.error.flatten() }); return; }
-      const result = game.execute(parsed.data);
+      const result = await game.execute(parsed.data);
       const client = clientResult(result);
       broadcast({ type: "EVENTS", ...client });
       send(response, 200, url.pathname === "/api/site/actions" ? siteResponse(`Committed ${result.events.length} event${result.events.length === 1 ? "" : "s"}; world version ${result.view.worldVersion}.`, client) : client);
@@ -81,8 +85,10 @@ const server = createServer(async (request, response) => {
   }
   if (url.pathname === "/api/site/events" && request.method === "GET") {
     const afterSequence = Number(url.searchParams.get("afterSequence") ?? 0);
-    const events = game.events.filter((event) => event.sequence > afterSequence);
-    send(response, 200, siteResponse(`${events.length} event${events.length === 1 ? "" : "s"} after sequence ${afterSequence}.`, { events, worldVersion: game.snapshot.version })); return;
+    const sessionId = url.searchParams.get("sessionId") ?? "demo";
+    const events = await game.getEvents(sessionId, afterSequence);
+    const view = await game.getView(sessionId, viewerId);
+    send(response, 200, siteResponse(`${events.length} event${events.length === 1 ? "" : "s"} after sequence ${afterSequence}.`, { fromSequence: afterSequence + 1, throughSequence: events.at(-1)?.sequence ?? afterSequence, worldVersion: view.worldVersion, events, hasMore: false })); return;
   }
   send(response, 404, { error: "Not found" });
 });
@@ -93,7 +99,7 @@ server.on("upgrade", (request, socket, head) => {
 });
 
 realtime.on("connection", (client) => {
-  client.send(JSON.stringify({ type: "SNAPSHOT", events: visibleEvents(), view: game.getView() }));
+  void (async () => client.send(JSON.stringify({ type: "SNAPSHOT", events: await visibleEvents(), view: await game.getView() })))();
 });
 
 server.listen(3001, () => console.log("Living RPG API listening on http://localhost:3001"));

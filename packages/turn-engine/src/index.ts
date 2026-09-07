@@ -14,7 +14,7 @@ export class TurnSession {
   get pendingCommands(): Command[] { return structuredClone(this.pending); }
 
   submit(command: Command): WorldEvent[] {
-    if (command.type === "MOVE_CHARACTER" || command.type === "ATTACK_TARGET") {
+    if (this.current.phase === "PLAYER_PLANNING" && (command.type === "MOVE_CHARACTER" || command.type === "ATTACK_TARGET")) {
       resolveCommand(command, this.current, this.current.version + 1);
       this.pending.push(command);
       return [];

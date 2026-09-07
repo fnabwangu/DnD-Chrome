@@ -26,6 +26,9 @@ importers:
       '@living-rpg/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@living-rpg/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@living-rpg/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
@@ -35,6 +38,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@living-rpg/application':
+        specifier: workspace:*
+        version: link:../../packages/application
       '@living-rpg/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
@@ -66,6 +72,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@living-rpg/application':
+        specifier: workspace:*
+        version: link:../application
       '@living-rpg/schemas':
         specifier: workspace:*
         version: link:../schemas

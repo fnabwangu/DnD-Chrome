@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export type Visibility = "public" | "party" | "private" | "gm";
 
-export type CommandType = "MOVE_CHARACTER" | "ATTACK_TARGET" | "RESPOND_REACTION" | "INTERACT_WITH_NPC" | "BEGIN_ENCOUNTER" | "END_PHASE";
+export type CommandType = "MOVE_CHARACTER" | "ATTACK_TARGET" | "RESPOND_REACTION" | "INTERACT_WITH_NPC" | "INSPECT_AREA" | "BEGIN_ENCOUNTER" | "END_PHASE";
 
 export interface Command {
   id: string;
@@ -15,7 +15,7 @@ export interface Command {
 
 export const CommandSchema = z.object({
   id: z.string().min(1).max(100),
-  type: z.enum(["MOVE_CHARACTER", "ATTACK_TARGET", "RESPOND_REACTION", "INTERACT_WITH_NPC", "BEGIN_ENCOUNTER", "END_PHASE"]),
+  type: z.enum(["MOVE_CHARACTER", "ATTACK_TARGET", "RESPOND_REACTION", "INTERACT_WITH_NPC", "INSPECT_AREA", "BEGIN_ENCOUNTER", "END_PHASE"]),
   sessionId: z.string().min(1).max(100),
   actorId: z.string().min(1).max(100),
   expectedWorldVersion: z.number().int().nonnegative(),
@@ -65,3 +65,5 @@ export interface WorldSnapshot {
   npcMemories: Record<string, string[]>;
   reactionWindow?: ReactionWindow;
 }
+
+export * from "./render.schema.js";

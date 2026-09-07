@@ -1,3 +1,5 @@
+export * from "./GameRepository.js";
+export * from "./GameService.js";
 import type { WorldEvent, WorldSnapshot } from "@living-rpg/schemas";
 
 export interface EventRepository {

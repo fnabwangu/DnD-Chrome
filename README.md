@@ -46,6 +46,25 @@ These provide:
 - `npm run test`
 - `npm run typecheck`
 
+## Stable Black Hart demo
+
+The web app boots directly into the credential-free `black-hart-render-v1` scene. Start it with:
+
+```sh
+pnpm install
+pnpm --filter @living-rpg/web dev
+```
+
+Open `http://localhost:3000/?demo=black-hart-render-v1`. The local `DemoGameAdapter` uses the shared application, rules, event, and reducer pipeline. A deployed host can set `globalThis.__LIVING_RPG_API_BASE` before the module loads to use the remote adapter; the client has no production localhost dependency and falls back to the local scene when the remote is unavailable.
+
+Focus the map and use `W`, `A`, `S`, or `D` to preview a cardinal move. Press `Enter` or **Commit move** to submit it through authority validation. `Escape` clears the preview. **Restart scene** restores the exact initial fixture. Audio waits for an explicit gesture, captions remain on, and typed input remains available when voice recognition or remote services are missing.
+
+Build and preview the static client with `pnpm --filter @living-rpg/web build` and `pnpm --filter @living-rpg/web preview`.
+
+## Persistent authority
+
+Run the API with `pnpm --filter @living-rpg/api dev`. It stores the demo session in `.data/black-hart.json` by default; set `LIVING_RPG_DATA_FILE` to a deployment-owned file path for local persistence. The browser uses same-origin `/api/site/*` routes by default. Use `/?demo=black-hart-render-v1` only for the explicit credential-free local adapter.
+
 The original playable proof is **The Black Hart Inn**. It uses an in-memory event log and can boot without credentials or external services.
 
 Additional demo commands:

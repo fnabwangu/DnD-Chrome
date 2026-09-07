@@ -1,7 +1,10 @@
 import { generateNews } from "@living-rpg/news-engine";
-import { CommandSchema, type Command, type CharacterState, type WorldEvent, type WorldSnapshot } from "@living-rpg/schemas";
+import { CommandSchema, SceneManifestV2Schema, type Command, type CharacterState, type WorldEvent, type WorldSnapshot, type SceneManifestV2 } from "@living-rpg/schemas";
 import { TurnSession } from "@living-rpg/turn-engine";
 import { z } from "zod";
+
+export { findCardinalPath } from "./tactical.js";
+export { lineOfSight } from "./line-of-sight.js";
 
 export const ActionProposalSchema = z.object({
   proposalId: z.string(),
@@ -42,7 +45,28 @@ export interface GameViewState {
   activeReaction?: WorldSnapshot["reactionWindow"];
   recentEvents: Array<Pick<WorldEvent, "id" | "type" | "sequence" | "actorId" | "targetId">>;
   news: ReturnType<typeof generateNews>;
+  renderManifest: SceneManifestV2;
 }
+
+const blockedCells = [
+  ...Array.from({ length: 16 }, (_, col) => ({ col, row: 0 })),
+  ...Array.from({ length: 16 }, (_, col) => ({ col, row: 8 })),
+  ...Array.from({ length: 7 }, (_, row) => ({ col: 0, row: row + 1 })),
+  ...Array.from({ length: 7 }, (_, row) => ({ col: 15, row: row + 1 })),
+  ...[3, 4].flatMap((row) => [5, 6, 7, 8, 9, 10].map((col) => ({ col, row }))),
+  ...[2, 3].flatMap((row) => [1, 2, 13, 14].map((col) => ({ col, row }))),
+  { col: 3, row: 6 }, { col: 3, row: 7 }
+];
+const blackHartMap = {
+  id: "black-hart-common-room-v1", logicalWidth: 1440 as const, logicalHeight: 810 as const, columns: 16 as const, rows: 9 as const, cellSize: 90 as const,
+  blockedCells, entrances: [{ col: 15, row: 5 }],
+  interactiveAreas: [
+    { id: "kings-road-door", label: "King's Road door", kind: "EXIT" as const, cells: [{ col: 15, row: 5 }] },
+    { id: "hearth", label: "The hearth", kind: "INSPECT" as const, cells: [{ col: 2, row: 5 }, { col: 2, row: 6 }] },
+    { id: "mara-bar", label: "Mara's bar", kind: "DIALOGUE" as const, cells: [{ col: 12, row: 6 }, { col: 13, row: 6 }] },
+    { id: "varro-table", label: "Captain Varro's table", kind: "DIALOGUE" as const, cells: [{ col: 9, row: 2 }, { col: 10, row: 2 }] }
+  ]
+};
 
 export interface ApplicationResult {
   events: WorldEvent[];
@@ -57,13 +81,25 @@ export const demoInitialSnapshot: WorldSnapshot = {
   knownSecrets: {},
   npcMemories: {},
   characters: {
-    xavi: { id: "xavi", name: "Xavi", hp: 12, maxHp: 12, x: 1, y: 1, alive: true },
-    matu: { id: "matu", name: "Matu", hp: 12, maxHp: 12, x: 1, y: 2, alive: true },
-    mara: { id: "mara", name: "Mara", hp: 10, maxHp: 10, x: 2, y: 1, alive: true },
-    "ash-raider": { id: "ash-raider", name: "Ash Raider", hp: 8, maxHp: 8, x: 5, y: 2, alive: true },
-    "coin-raider": { id: "coin-raider", name: "Coin Raider", hp: 8, maxHp: 8, x: 5, y: 4, alive: true }
+    xavi: { id: "xavi", name: "Xavi", hp: 12, maxHp: 12, x: 5, y: 6, alive: true },
+    matu: { id: "matu", name: "Matu", hp: 12, maxHp: 12, x: 5, y: 7, alive: true },
+    mara: { id: "mara", name: "Mara", hp: 10, maxHp: 10, x: 12, y: 6, alive: true },
+    varro: { id: "varro", name: "Captain Varro", hp: 14, maxHp: 14, x: 9, y: 2, alive: true },
+    stranger: { id: "stranger", name: "Hooded Stranger", hp: 8, maxHp: 8, x: 4, y: 2, alive: true },
+    "ash-raider": { id: "ash-raider", name: "Ash Raider", hp: 8, maxHp: 8, x: 12, y: 3, alive: true },
+    "coin-raider": { id: "coin-raider", name: "Coin Raider", hp: 8, maxHp: 8, x: 13, y: 4, alive: true }
   }
 };
+
+function buildRenderManifest(snapshot: WorldSnapshot, events: WorldEvent[], selectedActor = "xavi"): SceneManifestV2 {
+  const layoutMode = snapshot.reactionWindow || snapshot.phase !== "EXPLORATION" ? "combat" : "exploration";
+  return SceneManifestV2Schema.parse({ version: "2", sceneId: "location.black_hart.common_room", worldVersion: snapshot.version, layoutMode,
+    map: blackHartMap, camera: { stageWidth: 1440, stageHeight: 810, fit: "contain", minZoom: 1, maxZoom: 1.4 },
+    actors: Object.values(snapshot.characters).map((actor) => ({ id: actor.id, name: actor.name, control: ["xavi", "matu"].includes(actor.id) ? "player" : "npc", team: actor.id.includes("raider") ? "hostile" : ["xavi", "matu"].includes(actor.id) ? "party" : actor.id === "mara" ? "ally" : "neutral", position: { col: actor.x, row: actor.y }, facing: "down", hp: actor.hp, maxHp: actor.maxHp, alive: actor.alive, portraitAssetId: `portrait.${actor.id}`, tokenAssetId: `token.${actor.id}`, accessibleName: `${actor.name}, ${actor.hp} of ${actor.maxHp} hit points`, status: actor.alive ? "standing" : "down", selected: actor.id === selectedActor, targetable: actor.alive && actor.id !== selectedActor, visible: true })),
+    assets: { version: 1, assets: { "background.black-hart": { kind: "background", fallback: "#382d25" } } }, animationCues: events.slice(-10).map((event) => ({ eventId: event.id, type: event.type === "CHARACTER_MOVED" ? "MOVE" as const : event.type === "DAMAGE_APPLIED" ? "DAMAGE" as const : event.type === "REACTION_WINDOW_OPENED" ? "REACTION" as const : event.type === "PHASE_CHANGED" ? "REVEAL" as const : "DIALOGUE" as const, actorId: event.actorId, targetId: event.targetId, path: Array.isArray(event.payload.path) ? event.payload.path as Array<{ col: number; row: number }> : undefined })), audioCues: [{ id: "rain", assetId: "ambience.black_hart.rain", captions: "Rain at the windows" }],
+    capabilities: { background: false, portraits: false, tokens: false, audio: typeof globalThis !== "undefined" && "Audio" in globalThis, speechRecognition: false, speechSynthesis: typeof globalThis !== "undefined" && "speechSynthesis" in globalThis, remote: false }
+  });
+}
 
 function buildManifest(snapshot: WorldSnapshot, events: WorldEvent[]): SceneManifest {
   const layoutMode = snapshot.reactionWindow || snapshot.phase !== "EXPLORATION" ? "combat" : "exploration";
@@ -122,6 +158,7 @@ export class GameApplication {
       activeReaction: snapshot.reactionWindow,
       recentEvents: events.slice(-10).map(({ id, type, sequence, actorId, targetId }) => ({ id, type, sequence, actorId, targetId })),
       news: generateNews(events)
+        ,renderManifest: buildRenderManifest(snapshot, events, viewerId)
     };
   }
 
