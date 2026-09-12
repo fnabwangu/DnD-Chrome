@@ -1,5 +1,5 @@
 import { generateNews } from "@living-rpg/news-engine";
-import { CommandSchema, SceneManifestV2Schema, type Command, type CharacterState, type WorldEvent, type WorldSnapshot, type SceneManifestV2 } from "@living-rpg/schemas";
+import { CommandSchema, SceneManifestV2Schema, type Command, type CharacterState, type WorldEvent, type WorldSnapshot, type SceneManifestV2, type MovementPlan } from "@living-rpg/schemas";
 import { TurnSession } from "@living-rpg/turn-engine";
 import { z } from "zod";
 
@@ -37,6 +37,7 @@ export interface GameViewState {
   sessionId: string;
   viewerId: string;
   worldVersion: number;
+  round: number;
   phase: WorldSnapshot["phase"];
   worldTime: string;
   currentScene: SceneManifest;
@@ -46,6 +47,8 @@ export interface GameViewState {
   recentEvents: Array<Pick<WorldEvent, "id" | "type" | "sequence" | "actorId" | "targetId">>;
   news: ReturnType<typeof generateNews>;
   renderManifest: SceneManifestV2;
+  movementPlans: Record<string, MovementPlan>;
+  playerStatus: Record<string, { id: string; state: "Planning" | "Move queued" | "Ready" | "Resolving" | "Completed" | "Invalidated"; ready: boolean; queuedDestination?: { col: number; row: number }; invalidReason?: string; }>; 
 }
 
 const blockedCells = [
@@ -145,11 +148,14 @@ export class GameApplication {
   getView(viewerId = "player", sessionId = "demo"): GameViewState {
     const snapshot = this.session.snapshot;
     const events = this.session.eventLog.all();
+    const movementPlans = this.session.plans;
+    const playerStatus = this.session.playerStatus;
     return {
       version: "1",
       sessionId,
       viewerId,
       worldVersion: snapshot.version,
+      round: snapshot.round ?? 1,
       phase: snapshot.phase,
       worldTime: snapshot.worldTime,
       currentScene: buildManifest(snapshot, events),
@@ -157,8 +163,10 @@ export class GameApplication {
       availableActions: snapshot.reactionWindow ? ["RESPOND_REACTION"] : snapshot.phase === "EXPLORATION" ? ["TALK", "INSPECT", "BEGIN_ENCOUNTER"] : ["MOVE", "ATTACK", "COMMIT"],
       activeReaction: snapshot.reactionWindow,
       recentEvents: events.slice(-10).map(({ id, type, sequence, actorId, targetId }) => ({ id, type, sequence, actorId, targetId })),
-      news: generateNews(events)
-        ,renderManifest: buildRenderManifest(snapshot, events, viewerId)
+      news: generateNews(events),
+      renderManifest: buildRenderManifest(snapshot, events, viewerId),
+      movementPlans,
+      playerStatus
     };
   }
 

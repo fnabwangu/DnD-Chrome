@@ -2,7 +2,23 @@ import { z } from "zod";
 
 export type Visibility = "public" | "party" | "private" | "gm";
 
-export type CommandType = "MOVE_CHARACTER" | "ATTACK_TARGET" | "RESPOND_REACTION" | "INTERACT_WITH_NPC" | "INSPECT_AREA" | "BEGIN_ENCOUNTER" | "END_PHASE";
+export type GridCell = { col: number; row: number };
+
+export type MovementPlanStatus = "QUEUED" | "READY";
+
+export interface MovementPlan {
+  actorId: string;
+  source: GridCell;
+  destination: GridCell;
+  path: GridCell[];
+  movementCost: number;
+  expectedWorldVersion: number;
+  status: MovementPlanStatus;
+  round: number;
+  reason?: string;
+}
+
+export type CommandType = "MOVE_CHARACTER" | "ATTACK_TARGET" | "RESPOND_REACTION" | "INTERACT_WITH_NPC" | "INSPECT_AREA" | "BEGIN_ENCOUNTER" | "END_PHASE" | "SET_READY" | "CANCEL_READY";
 
 export interface Command {
   id: string;
@@ -15,7 +31,7 @@ export interface Command {
 
 export const CommandSchema = z.object({
   id: z.string().min(1).max(100),
-  type: z.enum(["MOVE_CHARACTER", "ATTACK_TARGET", "RESPOND_REACTION", "INTERACT_WITH_NPC", "INSPECT_AREA", "BEGIN_ENCOUNTER", "END_PHASE"]),
+  type: z.enum(["MOVE_CHARACTER", "ATTACK_TARGET", "RESPOND_REACTION", "INTERACT_WITH_NPC", "INSPECT_AREA", "BEGIN_ENCOUNTER", "END_PHASE", "SET_READY", "CANCEL_READY"]),
   sessionId: z.string().min(1).max(100),
   actorId: z.string().min(1).max(100),
   expectedWorldVersion: z.number().int().nonnegative(),
@@ -58,12 +74,15 @@ export interface ReactionWindow {
 
 export interface WorldSnapshot {
   version: number;
-  phase: "EXPLORATION" | "ENCOUNTER_START" | "PLAYER_PLANNING" | "PLAYER_RESOLUTION" | "ENEMY_RESOLUTION" | "ROUND_COMPLETE";
+  round?: number;
+  phase: "EXPLORATION" | "ENCOUNTER_START" | "PLAYER_PLANNING" | "PLAYER_COMMIT" | "AUTHORITATIVE_RESOLUTION" | "REACTION_WINDOWS" | "NARRATIVE_RESOLUTION" | "ENEMY_PLANNING" | "ENEMY_RESOLUTION" | "NEXT_ROUND" | "PLAYER_RESOLUTION" | "ROUND_COMPLETE";
   worldTime: string;
   characters: Record<string, CharacterState>;
   knownSecrets: Record<string, string[]>;
   npcMemories: Record<string, string[]>;
   reactionWindow?: ReactionWindow;
+  movementPlans?: Record<string, MovementPlan>;
+  readiness?: Record<string, boolean>;
 }
 
 export * from "./render.schema.js";

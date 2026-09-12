@@ -26,13 +26,36 @@ export function reduceWorld(snapshot: WorldSnapshot, event: WorldEvent): WorldSn
       break;
     case "PHASE_CHANGED":
       next.phase = event.payload.phase as WorldSnapshot["phase"];
+      if (event.payload.round !== undefined) next.round = event.payload.round as number;
       break;
+    case "MOVEMENT_QUEUED": {
+      const plan = event.payload.plan as Record<string, unknown>;
+      if (!next.movementPlans) next.movementPlans = {};
+      next.movementPlans[event.actorId ?? ""] = plan as any;
+      break;
+    }
+    case "MOVEMENT_CANCELLED": {
+      if (next.movementPlans) delete next.movementPlans[event.actorId ?? ""];
+      break;
+    }
+    case "PLAYER_READY": {
+      if (!next.readiness) next.readiness = {};
+      next.readiness[event.actorId ?? ""] = true;
+      break;
+    }
+    case "PLAYER_READY_CANCELLED": {
+      if (!next.readiness) next.readiness = {};
+      next.readiness[event.actorId ?? ""] = false;
+      break;
+    }
     case "CHARACTER_MOVED": {
       const character = next.characters[event.actorId ?? ""];
       if (character) {
         character.x = event.payload.x as number;
         character.y = event.payload.y as number;
       }
+      if (next.movementPlans) delete next.movementPlans[event.actorId ?? ""];
+      if (next.readiness) next.readiness[event.actorId ?? ""] = false;
       break;
     }
     case "DAMAGE_APPLIED": {

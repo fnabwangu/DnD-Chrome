@@ -1,4 +1,4 @@
-import type { Command, WorldEvent, WorldSnapshot } from "@living-rpg/schemas";
+import type { Command, MovementPlan, WorldEvent, WorldSnapshot } from "@living-rpg/schemas";
 
 export class RuleViolation extends Error {}
 
@@ -13,6 +13,34 @@ const blockedCells = new Set([
 
 function isCellOpen(x: number, y: number, snapshot: WorldSnapshot, actorId: string): boolean {
   return x >= 0 && x < 16 && y >= 0 && y < 9 && !blockedCells.has(`${x},${y}`) && !Object.values(snapshot.characters).some((character) => character.id !== actorId && character.alive && character.x === x && character.y === y);
+}
+
+function validateMovementPlan(snapshot: WorldSnapshot, actorId: string, destination: { x: number; y: number }, source?: { col: number; row: number }): MovementPlan {
+  const actor = snapshot.characters[actorId];
+  if (!actor || !actor.alive) throw new RuleViolation("Actor is not available");
+  const sourceCell = source ? { col: source.col, row: source.row } : { col: actor.x, row: actor.y };
+  if (sourceCell.col !== actor.x || sourceCell.row !== actor.y) throw new RuleViolation("Movement source is stale");
+  if (destination.x < 0 || destination.x >= 16 || destination.y < 0 || destination.y >= 9) throw new RuleViolation("Destination is out of bounds");
+  if (blockedCells.has(`${destination.x},${destination.y}`)) throw new RuleViolation("Destination is blocked");
+  const occupied = Object.values(snapshot.characters).some((character) => character.id !== actorId && character.alive && character.x === destination.x && character.y === destination.y);
+  if (occupied) throw new RuleViolation("Destination is occupied");
+  const path: Array<{ col: number; row: number }> = [{ col: actor.x, row: actor.y }, { col: destination.x, row: destination.y }];
+  const distance = Math.abs(destination.x - actor.x) + Math.abs(destination.y - actor.y);
+  if (distance === 0) throw new RuleViolation("No legal path");
+  if (distance > 6) throw new RuleViolation("Out of range");
+  const validPath = Array.from({ length: distance }, (_, index) => ({ col: actor.x + (index + 1) * Math.sign(destination.x - actor.x), row: actor.y + (index + 1) * Math.sign(destination.y - actor.y) }));
+  const finalPath = [{ col: actor.x, row: actor.y }, ...validPath.filter((cell) => cell.col !== actor.x || cell.row !== actor.y)];
+  if (finalPath.at(-1)?.col !== destination.x || finalPath.at(-1)?.row !== destination.y) throw new RuleViolation("No legal path");
+  return {
+    actorId,
+    source: { col: actor.x, row: actor.y },
+    destination: { col: destination.x, row: destination.y },
+    path: finalPath,
+    movementCost: distance,
+    expectedWorldVersion: snapshot.version,
+    status: "QUEUED",
+    round: snapshot.round ?? 1
+  };
 }
 
 function hasLineOfSight(sourceX: number, sourceY: number, targetX: number, targetY: number): boolean {
@@ -38,12 +66,24 @@ export function resolveCommand(command: Command, snapshot: WorldSnapshot, sequen
   switch (command.type) {
     case "BEGIN_ENCOUNTER":
       if (snapshot.phase !== "EXPLORATION") throw new RuleViolation("An encounter is already active");
-      return [{ ...base, type: "PHASE_CHANGED", payload: { phase: "PLAYER_PLANNING" } }];
+      return [{ ...base, type: "PHASE_CHANGED", payload: { phase: "PLAYER_PLANNING", round: snapshot.round ?? 1 } }];
+    case "SET_READY": {
+      if (snapshot.phase !== "PLAYER_PLANNING") throw new RuleViolation("Combat actions require player planning");
+      return [{ ...base, type: "PLAYER_READY", payload: { actorId: command.actorId } }];
+    }
+    case "CANCEL_READY": {
+      if (snapshot.phase !== "PLAYER_PLANNING") throw new RuleViolation("Combat actions require player planning");
+      return [{ ...base, type: "PLAYER_READY_CANCELLED", payload: { actorId: command.actorId } }];
+    }
     case "MOVE_CHARACTER": {
       const x = command.payload.x;
       const y = command.payload.y;
       const source = command.payload.source;
       if (typeof x !== "number" || typeof y !== "number" || !Number.isInteger(x) || !Number.isInteger(y)) throw new RuleViolation("Movement requires an integer grid cell");
+      if (snapshot.phase === "PLAYER_PLANNING") {
+        const plan = validateMovementPlan(snapshot, actor.id, { x, y }, source as { col: number; row: number } | undefined);
+        return [{ ...base, type: "MOVEMENT_QUEUED", payload: { actorId: actor.id, plan } }];
+      }
       if (source && (typeof source !== "object" || (source as { col?: unknown }).col !== actor.x || (source as { row?: unknown }).row !== actor.y)) throw new RuleViolation("Movement source is stale");
       if (Math.abs(x - actor.x) + Math.abs(y - actor.y) !== 1) throw new RuleViolation("Movement must be one cardinal step");
       if (!isCellOpen(x, y, snapshot, actor.id)) throw new RuleViolation("Destination is blocked or occupied");
